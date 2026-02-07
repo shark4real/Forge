@@ -1,15 +1,32 @@
 /**
  * ════════════════════════════════════════════════════════════════════════
- * FORGE — Blueprint Renderer (v2 — crash-proof)
+ * FORGE — Blueprint Renderer (TAMBO'S ROLE: DYNAMIC UI RENDERING)
  *
- * Takes a NORMALIZED UIBlueprint and renders it as a live React tree.
+ * RESPONSIBILITY SPLIT:
  *
- * Safety guarantees:
- *   1. Components resolved STRICTLY from the registry — unknown → FallbackComponent
- *   2. Every component wrapped in a per-component error boundary
- *   3. One broken component never unmounts the entire app
- *   4. Props validated via Zod safeParse with silent fallback
- *   5. Preview always renders SOMETHING — even if partially invalid
+ * • This module (Tambo's role):  Dynamically map component names → React
+ * • normalizeBlueprint (Our role):  Validate/sanitize AI output BEFORE here
+ *
+ * Takes a PRE-NORMALIZED UIBlueprint (already sanitized) and renders React.
+ *
+ * Tambo is NOT responsible for:
+ *   ❌ Validating AI output
+ *   ❌ Fixing malformed props
+ *   ❌ Preventing invalid React children
+ *   ❌ Normalizing AI JSON
+ *
+ * Tambo IS responsible for:
+ *   ✅ Mapping validated component names to React components from registry
+ *   ✅ Re-rendering when blueprint changes
+ *   ✅ Preserving UI continuity across updates
+ *   ✅ Reporting component render failures (error boundaries)
+ *
+ * Defense-in-depth guarantees:
+ *   1. Components resolved STRICTLY from registry (unknown → FallbackComponent)
+ *   2. Every component wrapped in error boundary (isolation)
+ *   3. One broken component never crashes entire app
+ *   4. Props re-validated via Zod safeParse (double-check)
+ *   5. Preview ALWAYS renders something (graceful degradation)
  * ════════════════════════════════════════════════════════════════════════
  */
 

@@ -19,6 +19,7 @@ import type { UIBlueprint } from "../types/blueprint";
 import BlueprintRenderer from "../components/BlueprintRenderer";
 import { componentRegistry } from "../registry";
 import { useForge } from "./forgeState";
+import { normalizeBlueprint } from "./normalizeBlueprint";
 
 /** Pre-computed registry metadata for the tool (avoids dynamic require). */
 const componentRegistryMeta = componentRegistry.map((entry) => ({
@@ -33,18 +34,48 @@ const componentRegistryMeta = componentRegistry.map((entry) => ({
  * stream.  Its props ARE the UIBlueprint schema.
  */
 
+/**
+ * ════════════════════════════════════════════════════════════════════════
+ * CRITICAL ARCHITECTURAL BOUNDARY
+ *
+ * This component is the MANDATORY NORMALIZATION LAYER between Tambo (AI)
+ * and React. It enforces the responsibility split:
+ *
+ *   Tambo's job:  Dynamically render AI-chosen components via registry
+ *   OUR job:      Validate, sanitize, and normalize ALL AI output
+ *
+ * NEVER trust AI output. ALWAYS normalize before rendering.
+ *
+ * Pipeline: User → Tambo AI → Raw JSON → THIS NORMALIZER → Safe Blueprint → React
+ * ════════════════════════════════════════════════════════════════════════
+ */
 export function ForgeBlueprint(props: UIBlueprint) {
   const { dispatch } = useForge();
   const dispatched = useRef(false);
 
-  useEffect(() => {
-    if (!dispatched.current && props.appType && props.sections?.length > 0) {
-      dispatched.current = true;
-      dispatch({ type: "PUSH_BLUEPRINT", blueprint: props, prompt: "Tambo AI" });
-    }
-  }, [props.appType, props.sections?.length, dispatch]);
+  // DEFENSIVE: Treat props as completely untrusted raw input from AI.
+  // Even if Tambo validates, we re-validate here as our final safety layer.
+  const rawInput = typeof props === "object" && props !== null ? props : {};
 
-  return <BlueprintRenderer blueprint={props} />;
+  const { blueprint, warnings, rawInput: normalizedRaw } = normalizeBlueprint(
+    rawInput as unknown as Record<string, unknown>,
+  );
+
+  useEffect(() => {
+    if (!dispatched.current && blueprint.appType && blueprint.sections?.length > 0) {
+      dispatched.current = true;
+      dispatch({
+        type: "PUSH_BLUEPRINT",
+        blueprint,
+        prompt: "Tambo AI",
+        rawInput: normalizedRaw,
+        normalizationWarnings: warnings,
+      });
+    }
+  }, [blueprint.appType, blueprint.sections?.length, dispatch, blueprint, normalizedRaw, warnings]);
+
+  // DEFENSIVE: Always render normalized blueprint, never raw AI props
+  return <BlueprintRenderer blueprint={blueprint} />;
 }
 
 /* ── Zod schema for the full Blueprint ─────────────────────────────── */

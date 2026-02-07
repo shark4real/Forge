@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useForge, type ViewTab } from "../lib/forgeState";
 import { hasGroq } from "../lib/groqClient";
+import { hasTambo } from "../lib/tamboClient";
 import ChatInterface from "./ChatInterface";
 import PreviewCanvas from "./PreviewCanvas";
 import ExplainabilityPanel from "./ExplainabilityPanel";
@@ -114,7 +115,11 @@ export default function ForgeApp() {
 
         {/* Status */}
         <div className="flex items-center gap-2">
-          {hasGroq ? (
+          {hasTambo ? (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+              <Zap size={8} /> Tambo AI
+            </span>
+          ) : hasGroq ? (
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/30 flex items-center gap-1">
               <Zap size={8} /> Groq AI
             </span>

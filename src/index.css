@@ -51,11 +51,17 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--forge-border);
-  border-radius: 3px;
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--forge-text-muted);
+}
+
+/* ── Remove Border Radius ──────────────────────────────────────────────── */
+
+* {
+  border-radius: 0 !important;
 }
 
 /* ── Animations ────────────────────────────────────────────────────────── */

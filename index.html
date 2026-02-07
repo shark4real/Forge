@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/forge-icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Forge — AI Product Builder</title>
+  </head>
+  <body style="margin:0;background:#030712;color:#f9fafb">
+    <div id="root"></div>
+    <div id="crash-overlay" style="display:none;position:fixed;inset:0;z-index:99999;background:#030712;padding:40px;color:#f87171;font-family:monospace;overflow:auto"></div>
+    <script>
+      // Global error handler — writes to a SEPARATE overlay, never touches #root
+      function showCrashOverlay(title, detail) {
+        var el = document.getElementById('crash-overlay');
+        if (!el) return;
+        el.style.display = 'block';
+        el.innerHTML = '<h1>' + title + '</h1><pre style="white-space:pre-wrap">' + detail + '</pre>';
+      }
+      window.onerror = function(msg, src, line, col, err) {
+        console.error('[Forge]', msg, err);
+        showCrashOverlay('JS Error', msg + '\n' + (src||'') + ':' + line + ':' + col + '\n' + (err && err.stack ? err.stack : ''));
+      };
+      window.addEventListener('unhandledrejection', function(e) {
+        console.error('[Forge] Unhandled rejection', e.reason);
+        showCrashOverlay('Unhandled Promise Rejection', (e.reason && e.reason.stack ? e.reason.stack : String(e.reason)));
+      });
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

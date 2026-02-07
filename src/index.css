@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/* ── Forge Design System ───────────────────────────────────────────────── */
+
+:root {
+  --forge-bg: #030712;
+  --forge-surface: #111827;
+  --forge-surface-alt: #1f2937;
+  --forge-border: #374151;
+  --forge-accent: #6366f1;
+  --forge-accent-light: #818cf8;
+  --forge-text: #f9fafb;
+  --forge-text-muted: #9ca3af;
+  --forge-success: #22c55e;
+  --forge-warning: #f59e0b;
+  --forge-error: #ef4444;
+}
+
+html {
+  color-scheme: dark;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+  background-color: #030712;
+  color: #f9fafb;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--forge-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--forge-text-muted);
+}
+
+/* ── Animations ────────────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+  50%      { box-shadow: 0 0 20px 4px rgba(99, 102, 241, 0.15); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.4s ease-out forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}

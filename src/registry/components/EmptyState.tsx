@@ -11,6 +11,17 @@ export interface EmptyStateProps {
   accentColor?: string;
 }
 
+function safe(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (typeof val === "object") {
+    const o = val as Record<string, unknown>;
+    return safe(o.label ?? o.title ?? o.text ?? o.name ?? "");
+  }
+  return String(val);
+}
+
 export default function EmptyState({
   icon = "📭",
   title,
@@ -18,19 +29,23 @@ export default function EmptyState({
   ctaLabel,
   accentColor = "#6366f1",
 }: EmptyStateProps) {
+  const safeIcon = safe(icon);
+  const safeTitle = safe(title) || "Nothing here yet";
+  const safeDesc = safe(description);
+  const safeCta = safe(ctaLabel);
   return (
     <div className="flex flex-col items-center justify-center text-center py-16 px-6">
-      <span className="text-5xl mb-4">{icon}</span>
-      <h3 className="text-lg font-semibold text-white mb-1">{title}</h3>
-      {description && (
-        <p className="text-sm text-gray-400 max-w-xs mb-4">{description}</p>
+      <span className="text-5xl mb-4">{safeIcon}</span>
+      <h3 className="text-lg font-semibold text-white mb-1">{safeTitle}</h3>
+      {safeDesc && (
+        <p className="text-sm text-gray-400 max-w-xs mb-4">{safeDesc}</p>
       )}
-      {ctaLabel && (
+      {safeCta && (
         <button
           className="px-5 py-2 rounded-lg text-sm font-medium text-white"
           style={{ backgroundColor: accentColor }}
         >
-          {ctaLabel}
+          {safeCta}
         </button>
       )}
     </div>

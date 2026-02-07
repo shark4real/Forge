@@ -151,7 +151,13 @@ const initialState: ForgeState = {
    ═════════════════════════════════════════════════════════════════════ */
 
 type ForgeAction =
-  | { type: "PUSH_BLUEPRINT"; blueprint: UIBlueprint; prompt: string }
+  | {
+      type: "PUSH_BLUEPRINT";
+      blueprint: UIBlueprint;
+      prompt: string;
+      rawInput?: Record<string, unknown>;
+      normalizationWarnings?: BlueprintSnapshot["normalizationWarnings"];
+    }
   | { type: "SET_ACTIVE_INDEX"; index: number }
   | { type: "TOGGLE_EXPLAINABILITY" }
   | { type: "RESET" }
@@ -175,6 +181,8 @@ function forgeReducer(state: ForgeState, action: ForgeAction): ForgeState {
         createdAt: new Date().toISOString(),
         prompt: action.prompt,
         blueprint: action.blueprint,
+        rawInput: action.rawInput,
+        normalizationWarnings: action.normalizationWarnings,
       };
       const history = [...state.history, snapshot];
       const wf = state.workflowNodes.map((n) =>

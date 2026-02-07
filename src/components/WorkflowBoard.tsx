@@ -65,7 +65,7 @@ function StatusBadge({ status }: { status: WorkflowNode["status"] }) {
 }
 
 export default function WorkflowBoard() {
-  const { workflowNodes, dispatch, history, notebookBlocks, assets } = useForge();
+  const { workflowNodes, dispatch, history, activeIndex, notebookBlocks, assets } = useForge();
 
   function navigateToStage(stage: string) {
     dispatch({ type: "SET_TAB", tab: stageTabMap[stage] || "build" });
@@ -77,6 +77,23 @@ export default function WorkflowBoard() {
   const totalAssets = assets.length;
   const completedStages = workflowNodes.filter((n) => n.status === "completed").length;
   const progress = Math.round((completedStages / workflowNodes.length) * 100);
+
+  const activeSnap = activeIndex >= 0 && activeIndex < history.length ? history[activeIndex] : null;
+  const normalizationWarnings = activeSnap?.normalizationWarnings ?? [];
+  const rawInput = activeSnap?.rawInput;
+
+  let rawJson = "";
+  let normalizedJson = "";
+  try {
+    rawJson = rawInput ? JSON.stringify(rawInput, null, 2) : "";
+  } catch {
+    rawJson = "[unserializable rawInput]";
+  }
+  try {
+    normalizedJson = activeSnap?.blueprint ? JSON.stringify(activeSnap.blueprint, null, 2) : "";
+  } catch {
+    normalizedJson = "[unserializable blueprint]";
+  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-gray-950/50">
@@ -211,6 +228,82 @@ export default function WorkflowBoard() {
               {totalRevisions === 0 ? "Describe your idea to start" : "blueprint versions"}
             </p>
           </button>
+        </div>
+
+        {/* ── Normalization log ─────────────────────────────────── */}
+        <div className="rounded-xl bg-gray-900/60 border border-gray-800/50 p-4 mb-8">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Normalization Log
+            </h3>
+            <span className="text-[10px] text-gray-500 font-mono">
+              {activeSnap ? `v${activeSnap.revision}` : "(no revision yet)"}
+            </span>
+          </div>
+
+          {!activeSnap ? (
+            <p className="text-xs text-gray-600">
+              Generate a blueprint in the Build tab to see normalization details here.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-gray-500 truncate">
+                  Prompt: <span className="text-gray-400">{activeSnap.prompt}</span>
+                </p>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full border font-mono shrink-0 ${
+                    normalizationWarnings.length > 0
+                      ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
+                      : "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                  }`}
+                >
+                  {normalizationWarnings.length} warning{normalizationWarnings.length === 1 ? "" : "s"}
+                </span>
+              </div>
+
+              {normalizationWarnings.length > 0 && (
+                <div className="rounded-lg border border-gray-800/60 bg-gray-950/40 p-3">
+                  <p className="text-[11px] text-gray-500 mb-2">Recent warnings</p>
+                  <div className="space-y-1 max-h-28 overflow-y-auto">
+                    {normalizationWarnings.slice(0, 12).map((w, i) => (
+                      <div key={i} className="text-[11px] text-gray-400">
+                        <span className="text-gray-500 font-mono">{w.type}</span>
+                        {w.componentName ? <span className="text-gray-600"> · </span> : null}
+                        {w.componentName ? (
+                          <span className="text-gray-500 font-mono">{w.componentName}</span>
+                        ) : null}
+                        <span className="text-gray-600"> — </span>
+                        <span className="text-gray-400">{w.detail}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(rawJson || normalizedJson) && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-gray-800/60 bg-gray-950/40 overflow-hidden">
+                    <div className="px-3 py-2 border-b border-gray-800/60 text-[11px] text-gray-500">
+                      Raw LLM JSON
+                    </div>
+                    <pre className="p-3 text-[10px] leading-relaxed text-gray-400 overflow-auto max-h-64">
+                      {rawJson || "(not captured)"}
+                    </pre>
+                  </div>
+                  <div className="rounded-lg border border-gray-800/60 bg-gray-950/40 overflow-hidden">
+                    <div className="px-3 py-2 border-b border-gray-800/60 text-[11px] text-gray-500">
+                      Normalized Blueprint
+                    </div>
+                    <pre className="p-3 text-[10px] leading-relaxed text-gray-400 overflow-auto max-h-64">
+                      {normalizedJson || "(missing)"}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Activity timeline ─────────────────────────────────────── */}

@@ -21,6 +21,17 @@ export interface AppShellProps {
   children?: React.ReactNode;
 }
 
+function safe(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (typeof val === "object") {
+    const o = val as Record<string, unknown>;
+    return safe(o.label ?? o.title ?? o.text ?? o.name ?? "");
+  }
+  return String(val);
+}
+
 export default function AppShell({
   appName,
   tagline,
@@ -29,6 +40,9 @@ export default function AppShell({
   sidebarItems = [],
   children,
 }: AppShellProps) {
+  const safeName = safe(appName);
+  const safeTagline = safe(tagline);
+  const safeSidebarItems = Array.isArray(sidebarItems) ? sidebarItems : [];
   return (
     <div
       className="flex h-full min-h-[480px] rounded-xl border border-gray-700/50 overflow-hidden bg-gray-900"
@@ -42,19 +56,19 @@ export default function AppShell({
               className="font-bold text-lg truncate"
               style={{ color: accentColor }}
             >
-              {appName}
+              {safeName}
             </h2>
-            {tagline && (
-              <p className="text-xs text-gray-400 mt-0.5 truncate">{tagline}</p>
+            {safeTagline && (
+              <p className="text-xs text-gray-400 mt-0.5 truncate">{safeTagline}</p>
             )}
           </div>
           <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-            {sidebarItems.map((item, i) => (
+            {safeSidebarItems.map((item, i) => (
               <button
                 key={i}
                 className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800 transition-colors"
               >
-                {item}
+                {safe(item)}
               </button>
             ))}
           </nav>
@@ -69,12 +83,12 @@ export default function AppShell({
               className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
               style={{ backgroundColor: accentColor }}
             >
-              {appName.charAt(0)}
+              {safeName.charAt(0)}
             </div>
             <div>
-              <h1 className="font-semibold text-white">{appName}</h1>
-              {tagline && (
-                <p className="text-xs text-gray-400">{tagline}</p>
+              <h1 className="font-semibold text-white">{safeName}</h1>
+              {safeTagline && (
+                <p className="text-xs text-gray-400">{safeTagline}</p>
               )}
             </div>
           </header>

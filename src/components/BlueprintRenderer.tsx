@@ -1,14 +1,15 @@
 /**
  * ════════════════════════════════════════════════════════════════════════
- * FORGE — Blueprint Renderer
+ * FORGE — Blueprint Renderer (v2 — crash-proof)
  *
- * Takes a UIBlueprint and renders it as a live React tree by:
- *   1. Iterating over blueprint.sections in order
- *   2. Resolving each component name against the registry
- *   3. Validating props via the Zod schema (silent fallback on error)
- *   4. Rendering the React component with validated props
+ * Takes a NORMALIZED UIBlueprint and renders it as a live React tree.
  *
- * This is the bridge between "AI output" and "user-visible UI".
+ * Safety guarantees:
+ *   1. Components resolved STRICTLY from the registry — unknown → FallbackComponent
+ *   2. Every component wrapped in a per-component error boundary
+ *   3. One broken component never unmounts the entire app
+ *   4. Props validated via Zod safeParse with silent fallback
+ *   5. Preview always renders SOMETHING — even if partially invalid
  * ════════════════════════════════════════════════════════════════════════
  */
 
@@ -22,28 +23,44 @@ export interface BlueprintRendererProps {
   blueprint: UIBlueprint;
 }
 
-/* ── Error boundary for individual components ──────────────────────── */
+/* ── Per-component error boundary ──────────────────────────────────── */
 
 class ComponentErrorBoundary extends React.Component<
   { name: string; children: React.ReactNode },
-  { hasError: boolean }
+  { hasError: boolean; errorMsg: string }
 > {
-  state = { hasError: false };
+  state = { hasError: false, errorMsg: "" };
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, errorMsg: error?.message ?? "Unknown render error" };
+  }
+
+  componentDidCatch(error: Error) {
+    console.warn(`[Forge Renderer] Component "${this.props.name}" crashed:`, error.message);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
-          ⚠ Component <span className="font-mono">{this.props.name}</span> failed to render.
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300">
+          <span className="font-semibold">⚠ Render warning</span>
+          <span className="text-amber-400/70 ml-1">— {this.props.name}</span>
+          <p className="text-xs text-amber-400/50 mt-1">{this.state.errorMsg}</p>
         </div>
       );
     }
     return this.props.children;
   }
+}
+
+/* ── Fallback for unknown components ───────────────────────────────── */
+
+function FallbackComponent({ name }: { name: string }) {
+  return (
+    <div className="rounded-lg border border-gray-700/30 bg-gray-800/30 p-3 text-sm text-gray-500 italic">
+      Component "{name}" is not in the registry — skipped.
+    </div>
+  );
 }
 
 /* ── Single component renderer ─────────────────────────────────────── */
@@ -58,11 +75,7 @@ function RenderComponent({
   const reg = getRegistryEntry(entry.componentName);
 
   if (!reg) {
-    return (
-      <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-300">
-        Unknown component: <span className="font-mono">{entry.componentName}</span>
-      </div>
-    );
+    return <FallbackComponent name={entry.componentName} />;
   }
 
   // Merge global accent if component didn't specify one
@@ -110,7 +123,6 @@ function RenderSection({
 export default function BlueprintRenderer({ blueprint }: BlueprintRendererProps) {
   const accent = blueprint.styleHints?.accentColor;
 
-  // Density → vertical gap
   const gap =
     blueprint.styleHints?.density === "compact"
       ? "gap-4"

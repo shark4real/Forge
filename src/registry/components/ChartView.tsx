@@ -167,14 +167,22 @@ export default function ChartView({
   type = "bar",
   accentColor = "#6366f1",
 }: ChartViewProps) {
+  const safeData = Array.isArray(data) ? data.filter(d => d && typeof d === "object" && typeof d.label === "string" && typeof d.value === "number") : [];
+  const safeTitle = title && typeof title === "string" ? title : title ? String(title) : undefined;
   return (
     <div className="rounded-xl border border-gray-700/50 bg-gray-800/40 p-5">
-      {title && (
-        <h3 className="font-semibold text-white mb-4">{title}</h3>
+      {safeTitle && (
+        <h3 className="font-semibold text-white mb-4">{safeTitle}</h3>
       )}
-      {type === "bar" && <BarChart data={data} accent={accentColor} />}
-      {type === "line" && <LineChart data={data} accent={accentColor} />}
-      {type === "pie" && <PieChart data={data} />}
+      {safeData.length === 0 ? (
+        <p className="text-sm text-gray-500 italic">No chart data available</p>
+      ) : (
+        <>
+          {type === "bar" && <BarChart data={safeData} accent={accentColor} />}
+          {type === "line" && <LineChart data={safeData} accent={accentColor} />}
+          {type === "pie" && <PieChart data={safeData} />}
+        </>
+      )}
     </div>
   );
 }

@@ -18,12 +18,25 @@ export interface CardListProps {
   accentColor?: string;
 }
 
+function safe(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (typeof val === "object") {
+    const o = val as Record<string, unknown>;
+    if (typeof o.label === "string") return o.label;
+    if (typeof o.title === "string") return o.title;
+  }
+  return String(val);
+}
+
 export default function CardList({
   heading,
   cards,
   layout = "vertical",
   accentColor = "#6366f1",
 }: CardListProps) {
+  const safeCards = Array.isArray(cards) ? cards : [];
   const containerClass =
     layout === "grid"
       ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
@@ -34,10 +47,10 @@ export default function CardList({
   return (
     <section className="py-4">
       {heading && (
-        <h2 className="text-xl font-bold text-white mb-4">{heading}</h2>
+        <h2 className="text-xl font-bold text-white mb-4">{safe(heading)}</h2>
       )}
       <div className={containerClass}>
-        {cards.map((card, i) => (
+        {safeCards.map((card, i) => (
           <div
             key={i}
             className={`rounded-xl border border-gray-700/50 bg-gray-800/50 p-4 hover:border-gray-600 transition-colors ${
@@ -57,7 +70,7 @@ export default function CardList({
               </div>
             )}
             <div className="flex items-start justify-between gap-2">
-              <h3 className="font-medium text-white text-sm">{card.title}</h3>
+              <h3 className="font-medium text-white text-sm">{safe(card.title)}</h3>
               {card.badge && (
                 <span
                   className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0"
@@ -66,17 +79,17 @@ export default function CardList({
                     color: accentColor,
                   }}
                 >
-                  {card.badge}
+                  {safe(card.badge)}
                 </span>
               )}
             </div>
             {card.description && (
               <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                {card.description}
+                {safe(card.description)}
               </p>
             )}
             {card.metadata && (
-              <p className="text-xs text-gray-500 mt-2">{card.metadata}</p>
+              <p className="text-xs text-gray-500 mt-2">{safe(card.metadata)}</p>
             )}
           </div>
         ))}

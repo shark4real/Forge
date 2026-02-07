@@ -20,6 +20,8 @@ export const hasGroq =
   !!GROQ_API_KEY &&
   GROQ_API_KEY !== "your_groq_api_key_here";
 
+console.log("[Forge] Groq configured:", hasGroq, "key prefix:", GROQ_API_KEY?.substring(0, 8) ?? "(none)");
+
 export interface GroqMessage {
   role: "system" | "user" | "assistant";
   content: string;

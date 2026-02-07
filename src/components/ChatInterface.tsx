@@ -13,6 +13,7 @@ import { Send, Loader2, Hammer } from "lucide-react";
 import { useForge } from "../lib/forgeState";
 import { matchDemoBlueprint } from "../lib/exampleBlueprints";
 import { generateBlueprintWithGroq, hasGroq } from "../lib/groqClient";
+import { normalizeBlueprint } from "../lib/normalizeBlueprint";
 import type { UIBlueprint } from "../types/blueprint";
 
 /* ── Message type ──────────────────────────────────────────────────── */
@@ -52,6 +53,7 @@ export default function ChatInterface() {
   /* ── Submit handler ──────────────────────────────────────────────── */
 
   async function handleSubmit(prompt: string) {
+    console.log("[Forge] handleSubmit called:", prompt, "hasGroq:", hasGroq);
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
       role: "user",
@@ -65,36 +67,63 @@ export default function ChatInterface() {
 
     if (demoBlueprint) {
       await new Promise((r) => setTimeout(r, 500));
+      // Run even demos through normalizer for consistency
+      const { blueprint: normalizedDemo, warnings: demoWarnings, rawInput: demoRaw } = normalizeBlueprint(
+        demoBlueprint as unknown as Record<string, unknown>,
+      );
+      if (demoWarnings.length > 0) {
+        console.log("[Forge] Demo blueprint normalization warnings:", demoWarnings);
+      }
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
         role: "assistant",
-        content: `Here's your ${demoBlueprint.appType} app! I've assembled ${demoBlueprint.sections.length} sections using components from the registry.`,
-        blueprint: demoBlueprint,
+        content: `Here's your ${normalizedDemo.appType} app! I've assembled ${normalizedDemo.sections.length} sections using components from the registry.`,
+        blueprint: normalizedDemo,
       };
       setMessages((prev) => [...prev, assistantMsg]);
-      dispatch({ type: "PUSH_BLUEPRINT", blueprint: demoBlueprint, prompt });
+      dispatch({
+        type: "PUSH_BLUEPRINT",
+        blueprint: normalizedDemo,
+        prompt,
+        rawInput: demoRaw,
+        normalizationWarnings: demoWarnings,
+      });
       setIsGenerating(false);
       return;
     }
 
     // 2. Groq AI generation for any freeform prompt
+    console.log("[Forge] No demo match, trying Groq. hasGroq:", hasGroq);
     if (hasGroq) {
       try {
         const existingJson = activeBlueprint
           ? JSON.stringify(activeBlueprint)
           : undefined;
+        console.log("[Forge] Calling generateBlueprintWithGroq...");
         const generated = await generateBlueprintWithGroq(prompt, existingJson);
+        console.log("[Forge] Groq returned:", generated ? Object.keys(generated) : null);
 
         if (generated && generated.appType && generated.sections) {
-          const blueprint = generated as unknown as UIBlueprint;
+          // ── Normalize LLM output before rendering ──
+          const { blueprint, warnings, rawInput } = normalizeBlueprint(generated);
+          if (warnings.length > 0) {
+            console.warn("[Forge] Normalization warnings:", warnings);
+          }
+          console.log("[Forge] Normalized blueprint:", blueprint.appType, blueprint.sections.length, "sections");
           const assistantMsg: ChatMessage = {
             id: `a-${Date.now()}`,
             role: "assistant",
-            content: `Here's your ${blueprint.appType} app! I've assembled ${(blueprint.sections as unknown[]).length} sections with realistic mock data. Try refining it — ask me to add features, change the style, or restructure the layout.`,
+            content: `Here's your ${blueprint.appType} app! I've assembled ${blueprint.sections.length} sections with realistic mock data.${warnings.length > 0 ? ` (${warnings.length} props auto-corrected)` : ""} Try refining it — ask me to add features, change the style, or restructure the layout.`,
             blueprint,
           };
           setMessages((prev) => [...prev, assistantMsg]);
-          dispatch({ type: "PUSH_BLUEPRINT", blueprint, prompt });
+          dispatch({
+            type: "PUSH_BLUEPRINT",
+            blueprint,
+            prompt,
+            rawInput,
+            normalizationWarnings: warnings,
+          });
           setIsGenerating(false);
           return;
         }

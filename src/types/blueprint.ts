@@ -73,6 +73,15 @@ export interface BlueprintExplanation {
   suggestedImprovements: string[];
 }
 
+/* ── Normalization diagnostics (crash-proofing) ───────────────────── */
+
+export interface NormalizationWarning {
+  type: "dropped-component" | "fixed-prop" | "default-applied" | "invalid-section";
+  sectionId?: string;
+  componentName?: string;
+  detail: string;
+}
+
 /* ── The Blueprint itself ──────────────────────────────────────────── */
 
 export interface UIBlueprint {
@@ -112,4 +121,10 @@ export interface BlueprintSnapshot {
   prompt: string;
   /** The blueprint itself */
   blueprint: UIBlueprint;
+
+  /** Raw LLM input before normalization (for debugging) */
+  rawInput?: Record<string, unknown>;
+
+  /** Warnings produced by normalizeBlueprint() */
+  normalizationWarnings?: NormalizationWarning[];
 }

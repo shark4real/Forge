@@ -16,6 +16,17 @@ export interface FeatureGridProps {
   accentColor?: string;
 }
 
+function safe(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (typeof val === "object") {
+    const o = val as Record<string, unknown>;
+    if (typeof o.label === "string") return o.label;
+  }
+  return String(val);
+}
+
 export default function FeatureGrid({
   heading,
   features,
@@ -37,22 +48,22 @@ export default function FeatureGrid({
         </h2>
       )}
       <div className={`grid ${colClass} gap-5`}>
-        {features.map((f, i) => (
+        {(Array.isArray(features) ? features : []).map((f, i) => (
           <div
             key={i}
             className="rounded-xl border border-gray-700/50 bg-gray-800/60 p-5 hover:border-gray-600 transition-colors"
           >
             {f.icon && (
-              <span className="text-2xl mb-3 block">{f.icon}</span>
+              <span className="text-2xl mb-3 block">{safe(f.icon)}</span>
             )}
             <h3
               className="font-semibold mb-1"
               style={{ color: accentColor }}
             >
-              {f.title}
+              {safe(f.title)}
             </h3>
             <p className="text-sm text-gray-400 leading-relaxed">
-              {f.description}
+              {safe(f.description)}
             </p>
           </div>
         ))}

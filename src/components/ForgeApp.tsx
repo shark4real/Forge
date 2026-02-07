@@ -51,6 +51,7 @@ export default function ForgeApp() {
     activeIndex,
     history,
     showExplainability,
+    editMode,
     activeTab,
     notebookBlocks,
     assets,
@@ -62,6 +63,10 @@ export default function ForgeApp() {
 
   function handleSuggestionFromPanel(_suggestion: string) {
     dispatch({ type: "TOGGLE_EXPLAINABILITY" });
+  }
+
+  function handlePropertyChange(sectionId: string, componentIndex: number, propPath: string, value: any) {
+    dispatch({ type: "UPDATE_COMPONENT_PROP", sectionId, componentIndex, propPath, value });
   }
 
   /* ── Badge counts ────────────────────────────────────────────────── */
@@ -147,6 +152,9 @@ export default function ForgeApp() {
               onToggleExplainability={() =>
                 dispatch({ type: "TOGGLE_EXPLAINABILITY" })
               }
+              editMode={editMode}
+              onToggleEditMode={() => dispatch({ type: "TOGGLE_EDIT_MODE" })}
+              onPropertyChange={handlePropertyChange}
             />
 
             {showExplainability && explanation && (

@@ -1,17 +1,15 @@
 /**
  * ════════════════════════════════════════════════════════════════════════
- * FORGE — Main Application Shell (v2)
+ * FORGE — Main Application Shell (v3)
  *
  * Tab-based layout with 5 views:
- *   Build     — Chat + Preview + Explainability (original 3-column)
+ *   Build     — Chat + Preview + Explainability (Groq AI powered)
  *   Workflow  — Figma-like visual pipeline
  *   Notebook  — Notion-style block editor
  *   Assets    — Upload & manage images / designs
  *   Preview   — Full-screen device-frame preview + export
  *
- * Supports two modes:
- *   1. TAMBO MODE — AI flows through Tambo Cloud
- *   2. DEMO MODE — pre-baked example blueprints
+ * AI generation: Groq (Llama 3.3 70B) + demo blueprint fallbacks
  * ════════════════════════════════════════════════════════════════════════
  */
 
@@ -22,8 +20,10 @@ import {
   BookOpen,
   ImageIcon,
   Eye,
+  Zap,
 } from "lucide-react";
 import { useForge, type ViewTab } from "../lib/forgeState";
+import { hasGroq } from "../lib/groqClient";
 import ChatInterface from "./ChatInterface";
 import PreviewCanvas from "./PreviewCanvas";
 import ExplainabilityPanel from "./ExplainabilityPanel";
@@ -31,99 +31,6 @@ import WorkflowBoard from "./WorkflowBoard";
 import Notebook from "./Notebook";
 import AssetManager from "./AssetManager";
 import LivePreview from "./LivePreview";
-import { useTamboThread, useTamboThreadInput, useTamboGenerationStage } from "@tambo-ai/react";
-import type { UIBlueprint } from "../types/blueprint";
-import React, { useEffect, useRef, useMemo } from "react";
-
-/* ── Error boundary for Tambo subtree ─────────────────────────────── */
-
-class TamboBoundary extends React.Component<
-  { children: React.ReactNode; fallback: React.ReactNode },
-  { hasError: boolean }
-> {
-  state = { hasError: false };
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  componentDidCatch(err: Error) {
-    console.warn("[Forge] Tambo error caught:", err.message);
-  }
-  render() {
-    return this.state.hasError ? this.props.fallback : this.props.children;
-  }
-}
-
-/* ── ConnectedChat — bridges Tambo hooks → ChatInterface props ────── */
-
-function ConnectedChat() {
-  const { dispatch } = useForge();
-  const { thread } = useTamboThread();
-  const { setValue, submit } = useTamboThreadInput();
-  const { generationStage } = useTamboGenerationStage();
-  const lastMessageCountRef = useRef(0);
-
-  const rawMessages = thread?.messages ?? [];
-
-  const messages = useMemo(
-    () =>
-      rawMessages.map((m: any) => ({
-        id: m.id ?? String(Math.random()),
-        role: (m.role ?? "assistant") as string,
-        content:
-          typeof m.content === "string"
-            ? m.content
-            : Array.isArray(m.content)
-              ? m.content.map((c: any) => c.text ?? "").join("")
-              : JSON.stringify(m.content ?? ""),
-        renderedComponent: m.renderedComponent,
-      })),
-    [rawMessages],
-  );
-
-  const isPending =
-    generationStage !== "IDLE" &&
-    generationStage !== "COMPLETE" &&
-    generationStage !== "ERROR" &&
-    generationStage !== "CANCELLED";
-
-  /* Watch for newly rendered ForgeBlueprint components and dispatch */
-  useEffect(() => {
-    if (messages.length > lastMessageCountRef.current) {
-      const latestAssistant = [...messages]
-        .reverse()
-        .find((m: any) => m.role === "assistant" && m.renderedComponent);
-      if (latestAssistant?.renderedComponent) {
-        try {
-          const props = (latestAssistant.renderedComponent as any)?.props;
-          if (props && props.appType && props.sections) {
-            dispatch({
-              type: "PUSH_BLUEPRINT",
-              blueprint: props as UIBlueprint,
-              prompt: "Tambo AI",
-            });
-          }
-        } catch {
-          /* ignore extraction errors */
-        }
-      }
-      lastMessageCountRef.current = messages.length;
-    }
-  }, [messages, dispatch]);
-
-  function handleSubmit(text: string) {
-    setValue(text);
-    setTimeout(() => submit(), 50);
-  }
-
-  return (
-    <ChatInterface
-      tamboConnected
-      tamboMessages={messages}
-      tamboSubmit={handleSubmit}
-      tamboIsPending={isPending}
-    />
-  );
-}
 
 /* ── Tab definitions ───────────────────────────────────────────────── */
 
@@ -135,15 +42,9 @@ const tabs: { id: ViewTab; label: string; icon: React.ReactNode }[] = [
   { id: "preview",  label: "Preview",  icon: <Eye size={14} /> },
 ];
 
-/* ── Props ─────────────────────────────────────────────────────────── */
-
-interface ForgeAppProps {
-  tamboConnected?: boolean;
-}
-
 /* ── Component ─────────────────────────────────────────────────────── */
 
-export default function ForgeApp({ tamboConnected = false }: ForgeAppProps) {
+export default function ForgeApp() {
   const {
     activeBlueprint,
     activeIndex,
@@ -212,15 +113,14 @@ export default function ForgeApp({ tamboConnected = false }: ForgeAppProps) {
         </nav>
 
         {/* Status */}
-        <div className="flex items-center gap-3">
-          {!tamboConnected && (
+        <div className="flex items-center gap-2">
+          {hasGroq ? (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/30 flex items-center gap-1">
+              <Zap size={8} /> Groq AI
+            </span>
+          ) : (
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
               Demo
-            </span>
-          )}
-          {tamboConnected && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/30">
-              Tambo
             </span>
           )}
         </div>
@@ -228,17 +128,11 @@ export default function ForgeApp({ tamboConnected = false }: ForgeAppProps) {
 
       {/* ── Tab content ────────────────────────────────────────────── */}
       <div className="flex-1 overflow-hidden">
-        {/* BUILD — original 3-column layout */}
+        {/* BUILD — Chat + Preview */}
         {activeTab === "build" && (
           <div className="h-full flex overflow-hidden">
             <div className="w-96 shrink-0 border-r border-gray-700/50 bg-gray-900/60">
-              {tamboConnected ? (
-                <TamboBoundary fallback={<ChatInterface tamboConnected={false} />}>
-                  <ConnectedChat />
-                </TamboBoundary>
-              ) : (
-                <ChatInterface tamboConnected={false} />
-              )}
+              <ChatInterface />
             </div>
 
             <PreviewCanvas

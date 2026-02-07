@@ -1,14 +1,10 @@
 /**
  * ════════════════════════════════════════════════════════════════════════
- * FORGE — Chat Interface
+ * FORGE — Chat Interface (v3 — Groq-only)
  *
- * Left-hand conversation panel.  In TAMBO MODE (with valid API key),
- * messages flow through Tambo's SDK. In DEMO MODE (no key), we use
- * the pre-baked example blueprints for instant results.
- *
- * This component integrates with Tambo via:
- *   • useTamboThread()       — thread & messages
- *   • useTamboThreadInput()  — input value & submit
+ * Left-hand conversation panel.
+ *   1. Tries pre-baked demo blueprints for instant results.
+ *   2. Falls back to Groq AI (Llama 3.3 70B) for any freeform prompt.
  * ════════════════════════════════════════════════════════════════════════
  */
 
@@ -19,7 +15,7 @@ import { matchDemoBlueprint } from "../lib/exampleBlueprints";
 import { generateBlueprintWithGroq, hasGroq } from "../lib/groqClient";
 import type { UIBlueprint } from "../types/blueprint";
 
-/* ── Message type (local, for demo mode) ───────────────────────────── */
+/* ── Message type ──────────────────────────────────────────────────── */
 
 interface ChatMessage {
   id: string;
@@ -28,9 +24,9 @@ interface ChatMessage {
   blueprint?: UIBlueprint;
 }
 
-/* ── Demo prompts ──────────────────────────────────────────────────── */
+/* ── Suggested prompts ─────────────────────────────────────────────── */
 
-const DEMO_PROMPTS = [
+const SUGGESTED_PROMPTS = [
   "A habit tracking app",
   "A SaaS landing page with pricing",
   "A personal finance tracker",
@@ -40,27 +36,7 @@ const DEMO_PROMPTS = [
 
 /* ── Component ─────────────────────────────────────────────────────── */
 
-interface ChatInterfaceProps {
-  /** Whether Tambo cloud is connected */
-  tamboConnected: boolean;
-  /** Thread messages from Tambo (when connected) */
-  tamboMessages?: Array<{
-    id: string;
-    role: string;
-    content: unknown;
-    renderedComponent?: React.ReactNode;
-  }>;
-  /** Submit handler from Tambo (when connected) */
-  tamboSubmit?: (value: string) => void;
-  tamboIsPending?: boolean;
-}
-
-export default function ChatInterface({
-  tamboConnected,
-  tamboMessages,
-  tamboSubmit,
-  tamboIsPending,
-}: ChatInterfaceProps) {
+export default function ChatInterface() {
   const { dispatch, history, activeIndex, activeBlueprint } = useForge();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -68,16 +44,14 @@ export default function ChatInterface({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const isPending = tamboConnected ? tamboIsPending : isGenerating;
-
   /* Auto-scroll to bottom */
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, tamboMessages]);
+  }, [messages]);
 
-  /* ── Demo-mode submit ────────────────────────────────────────────── */
+  /* ── Submit handler ──────────────────────────────────────────────── */
 
-  async function handleDemoSubmit(prompt: string) {
+  async function handleSubmit(prompt: string) {
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
       role: "user",
@@ -86,12 +60,11 @@ export default function ChatInterface({
     setMessages((prev) => [...prev, userMsg]);
     setIsGenerating(true);
 
-    // First try pre-baked demo blueprints
+    // 1. Check pre-baked demo blueprints first (instant)
     const demoBlueprint = matchDemoBlueprint(prompt);
 
     if (demoBlueprint) {
-      // Small delay for feel
-      await new Promise((r) => setTimeout(r, 600));
+      await new Promise((r) => setTimeout(r, 500));
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
         role: "assistant",
@@ -104,7 +77,7 @@ export default function ChatInterface({
       return;
     }
 
-    // If no demo match, try Groq AI generation
+    // 2. Groq AI generation for any freeform prompt
     if (hasGroq) {
       try {
         const existingJson = activeBlueprint
@@ -130,13 +103,13 @@ export default function ChatInterface({
       }
     }
 
-    // Fallback: no match and no Groq
+    // 3. Fallback when Groq is missing or fails
     const fallbackMsg: ChatMessage = {
       id: `a-${Date.now()}`,
       role: "assistant",
       content: hasGroq
         ? "I had trouble generating that blueprint. Try rephrasing your idea or use one of the suggested prompts below."
-        : "I'd love to help build that! Try one of the suggested prompts to see a full demo, or add a Groq API key for AI-powered generation of any idea.",
+        : "Add a VITE_GROQ_API_KEY to your .env.local to unlock AI generation for any idea! For now, try one of the suggested prompts.",
     };
     setMessages((prev) => [...prev, fallbackMsg]);
     setIsGenerating(false);
@@ -147,36 +120,19 @@ export default function ChatInterface({
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const trimmed = input.trim();
-    if (!trimmed || isPending) return;
-
-    if (tamboConnected && tamboSubmit) {
-      tamboSubmit(trimmed);
-    } else {
-      handleDemoSubmit(trimmed);
-    }
+    if (!trimmed || isGenerating) return;
     setInput("");
+    handleSubmit(trimmed);
   }
 
   function handleSuggestionClick(prompt: string) {
-    setInput(prompt);
-    if (tamboConnected && tamboSubmit) {
-      tamboSubmit(prompt);
-    } else {
-      handleDemoSubmit(prompt);
-    }
+    if (isGenerating) return;
+    handleSubmit(prompt);
   }
 
-  /* ── Render helpers ──────────────────────────────────────────────── */
+  /* ── Render ──────────────────────────────────────────────────────── */
 
-  const displayMessages = tamboConnected
-    ? (tamboMessages ?? []).map((m) => ({
-        id: m.id,
-        role: m.role as "user" | "assistant",
-        content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-      }))
-    : messages;
-
-  const showWelcome = displayMessages.length === 0;
+  const showWelcome = messages.length === 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -189,13 +145,13 @@ export default function ChatInterface({
             </div>
             <h2 className="text-xl font-bold text-white mb-2">Welcome to Forge</h2>
             <p className="text-sm text-gray-400 max-w-sm mb-6">
-              Describe a product idea and I'll build a live, interactive React app
-              for you — powered by AI.
+              Describe a product idea and I'll build a live, interactive UI
+              for you — powered by Groq AI.
             </p>
 
-            {/* Demo prompts */}
+            {/* Suggested prompts */}
             <div className="flex flex-wrap gap-2 justify-center">
-              {DEMO_PROMPTS.map((prompt) => (
+              {SUGGESTED_PROMPTS.map((prompt) => (
                 <button
                   key={prompt}
                   onClick={() => handleSuggestionClick(prompt)}
@@ -208,7 +164,7 @@ export default function ChatInterface({
           </div>
         )}
 
-        {displayMessages.map((msg) => (
+        {messages.map((msg) => (
           <div
             key={msg.id}
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -225,7 +181,7 @@ export default function ChatInterface({
           </div>
         ))}
 
-        {isPending && (
+        {isGenerating && (
           <div className="flex justify-start">
             <div className="bg-gray-800/80 rounded-xl rounded-bl-sm border border-gray-700/40 px-4 py-2.5 flex items-center gap-2 text-sm text-gray-400">
               <Loader2 size={14} className="animate-spin" />
@@ -268,12 +224,12 @@ export default function ChatInterface({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Describe your product idea…"
-            disabled={isPending}
+            disabled={isGenerating}
             className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 focus:outline-none disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={!input.trim() || isPending}
+            disabled={!input.trim() || isGenerating}
             className="p-1.5 rounded-lg bg-indigo-500 text-white disabled:opacity-30 hover:bg-indigo-400 transition-colors"
           >
             <Send size={14} />

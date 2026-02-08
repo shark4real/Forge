@@ -87,6 +87,7 @@ interface ForgeState {
   history: BlueprintSnapshot[];
   activeIndex: number;
   showExplainability: boolean;
+  editMode: boolean;
   notebookBlocks: NotebookBlock[];
   assets: UploadedAsset[];
   workflowNodes: WorkflowNode[];
@@ -140,6 +141,7 @@ const initialState: ForgeState = {
   history: [],
   activeIndex: -1,
   showExplainability: false,
+  editMode: false,
   notebookBlocks: [],
   assets: [],
   workflowNodes: defaultWorkflow,
@@ -160,6 +162,8 @@ type ForgeAction =
     }
   | { type: "SET_ACTIVE_INDEX"; index: number }
   | { type: "TOGGLE_EXPLAINABILITY" }
+  | { type: "TOGGLE_EDIT_MODE" }
+  | { type: "UPDATE_COMPONENT_PROP"; sectionId: string; componentIndex: number; propPath: string; value: any }
   | { type: "RESET" }
   | { type: "SET_TAB"; tab: ViewTab }
   | { type: "ADD_BLOCK"; block: NotebookBlock }
@@ -198,6 +202,38 @@ function forgeReducer(state: ForgeState, action: ForgeAction): ForgeState {
       return { ...state, activeIndex: action.index };
     case "TOGGLE_EXPLAINABILITY":
       return { ...state, showExplainability: !state.showExplainability };
+    case "TOGGLE_EDIT_MODE":
+      return { ...state, editMode: !state.editMode };
+    case "UPDATE_COMPONENT_PROP": {
+      if (state.activeIndex < 0) return state;
+      const newHistory = [...state.history];
+      const currentSnapshot = newHistory[state.activeIndex];
+      const updatedBlueprint = { ...currentSnapshot.blueprint };
+      const sectionIdx = updatedBlueprint.sections.findIndex(s => s.id === action.sectionId);
+      if (sectionIdx === -1) return state;
+      
+      const updatedSections = [...updatedBlueprint.sections];
+      const section = { ...updatedSections[sectionIdx] };
+      const components = [...section.components];
+      const component = { ...components[action.componentIndex] };
+      const props = { ...component.props };
+      
+      // Update the prop value
+      props[action.propPath] = action.value;
+      
+      component.props = props;
+      components[action.componentIndex] = component;
+      section.components = components;
+      updatedSections[sectionIdx] = section;
+      updatedBlueprint.sections = updatedSections;
+      
+      newHistory[state.activeIndex] = {
+        ...currentSnapshot,
+        blueprint: updatedBlueprint,
+      };
+      
+      return { ...state, history: newHistory };
+    }
     case "RESET":
       return initialState;
 

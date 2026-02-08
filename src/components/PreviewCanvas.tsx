@@ -8,7 +8,7 @@
  * ════════════════════════════════════════════════════════════════════════
  */
 
-import { Eye, EyeOff, Smartphone, Monitor, RotateCcw } from "lucide-react";
+import { Eye, EyeOff, Smartphone, Monitor, RotateCcw, Edit3 } from "lucide-react";
 import { useState } from "react";
 import BlueprintRenderer from "./BlueprintRenderer";
 import type { UIBlueprint } from "../types/blueprint";
@@ -18,6 +18,9 @@ interface PreviewCanvasProps {
   revision: number;
   showExplainability: boolean;
   onToggleExplainability: () => void;
+  editMode?: boolean;
+  onToggleEditMode?: () => void;
+  onPropertyChange?: (sectionId: string, componentIndex: number, propPath: string, value: any) => void;
 }
 
 export default function PreviewCanvas({
@@ -25,6 +28,9 @@ export default function PreviewCanvas({
   revision,
   showExplainability,
   onToggleExplainability,
+  editMode = false,
+  onToggleEditMode,
+  onPropertyChange,
 }: PreviewCanvasProps) {
   const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop");
 
@@ -83,6 +89,23 @@ export default function PreviewCanvas({
 
           <div className="w-px h-4 bg-gray-700 mx-1" />
 
+          {/* Edit mode toggle */}
+          {onToggleEditMode && (
+            <button
+              onClick={onToggleEditMode}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors ${
+                editMode
+                  ? "bg-indigo-500/20 text-indigo-300"
+                  : "text-gray-400 hover:text-gray-200 hover:bg-gray-800"
+              }`}
+            >
+              <Edit3 size={12} />
+              Edit Mode
+            </button>
+          )}
+
+          <div className="w-px h-4 bg-gray-700 mx-1" />
+
           {/* Explainability toggle */}
           <button
             onClick={onToggleExplainability}
@@ -105,7 +128,11 @@ export default function PreviewCanvas({
             viewMode === "mobile" ? "max-w-sm" : "max-w-5xl"
           }`}
         >
-          <BlueprintRenderer blueprint={blueprint} />
+          <BlueprintRenderer
+            blueprint={blueprint}
+            editMode={editMode}
+            onPropertyChange={onPropertyChange}
+          />
         </div>
       </div>
     </div>

@@ -1,19 +1,26 @@
 /**
  * ════════════════════════════════════════════════════════════════════════
- * FORGE — Blueprint Normalizer
+ * FORGE — Blueprint Normalizer (CRITICAL SAFETY LAYER)
  *
- * Mandatory bridge between raw LLM JSON and the React render tree.
+ * ARCHITECTURAL RESPONSIBILITY SPLIT:
  *
- * NEVER render raw AI output directly. Always run through:
- *   normalizeBlueprint(rawLLMOutput) → safe UIBlueprint
+ * • Tambo (AI renderer):  Maps component names to React components
+ * • THIS MODULE (Our responsibility):  Validates & sanitizes ALL AI output
  *
- * This module:
- *   1. Validates component names against the registry
- *   2. Drops unknown components silently (logged as warnings)
- *   3. Ensures all props are render-safe (strings, numbers, booleans, arrays)
- *   4. Converts object-shaped props (e.g. {label,href}) into flat strings
- *   5. Applies default values when props are missing or malformed
- *   6. NEVER throws — always returns a valid blueprint
+ * NEVER BYPASS THIS LAYER. AI output must NEVER reach React directly.
+ *
+ * Correct pipeline:
+ *   User Prompt → AI (Tambo/Groq) → Raw JSON → normalizeBlueprint() → React
+ *
+ * This module guarantees:
+ *   1. Component names validated against registry (unknown → dropped + warning)
+ *   2. All props are React-safe (no raw objects as JSX children crashes)
+ *   3. Object props flattened to strings ({label:"foo"} → "foo")
+ *   4. Missing/malformed props replaced with safe defaults
+ *   5. Deep sanitization — nested objects, arrays, all values checked
+ *   6. NEVER throws — returns valid blueprint even if AI outputs garbage
+ *
+ * One broken prop never crashes the entire app.
  * ════════════════════════════════════════════════════════════════════════
  */
 
@@ -30,18 +37,23 @@ export interface NormalizationResult {
 
 /* ── Helpers ────────────────────────────────────────────────────────── */
 
-/** Safely convert any value to a render-safe string */
+/**
+ * CRITICAL: Prevents "Objects are not valid as a React child" crashes.
+ * AI may output {label:"Buy Now", href:"/pricing"} where we need "Buy Now".
+ * This helper NEVER returns an object — always a renderable string.
+ */
 function toSafeString(val: unknown): string {
   if (val === null || val === undefined) return "";
   if (typeof val === "string") return val;
   if (typeof val === "number" || typeof val === "boolean") return String(val);
   if (typeof val === "object") {
-    // {label: "foo", href: "/bar"} → "foo"
+    // Extract displayable label from common object shapes
     const obj = val as Record<string, unknown>;
     if ("label" in obj && typeof obj.label === "string") return obj.label;
     if ("title" in obj && typeof obj.title === "string") return obj.title;
     if ("name" in obj && typeof obj.name === "string") return obj.name;
     if ("text" in obj && typeof obj.text === "string") return obj.text;
+    // Last resort: stringify (safer than crashing)
     try { return JSON.stringify(val); } catch { return "[object]"; }
   }
   return String(val);
@@ -60,7 +72,15 @@ function ensureArray(val: unknown): unknown[] {
   return [val];
 }
 
-/** Deep-sanitize an object so no nested value can crash React */
+/**
+ * Deep-sanitize an object so no nested value can crash React.
+ *
+ * React crashes if you render <div>{someObject}</div>. This recursively
+ * ensures every nested value is primitive (string/number/boolean/null)
+ * or a safe array/object containing only primitives.
+ *
+ * AI may nest arbitrary data structures — this flattens them safely.
+ */
 function sanitizeValue(val: unknown): unknown {
   if (val === null || val === undefined) return val;
   if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") return val;
@@ -72,6 +92,7 @@ function sanitizeValue(val: unknown): unknown {
     }
     return out;
   }
+  // Function, Symbol, etc. → coerce to string (safer than undefined)
   return String(val);
 }
 
